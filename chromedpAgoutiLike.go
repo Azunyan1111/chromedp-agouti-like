@@ -24,8 +24,8 @@ type Selection struct {
 	QueryType chromedp.QueryOption
 }
 
-func NewPage()(*Page,error){
-	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", false))...)
+func NewPage(isHeadless bool)(*Page,error){
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", isHeadless))...)
 	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
 	return &Page{CtxAlloc:allocCtx,CancelAlloc:allocCancel, Ctx:taskCtx, CloseWindow:taskCancel},nil
 }
@@ -52,6 +52,11 @@ func (s *Selection)Text()(text string,err error){
 	return text,err
 }
 
+func (s *Selection)Value()(text string,err error){
+	err = chromedp.Run(s.Ctx,chromedp.Value(s.Query,&text, chromedp.NodeVisible, s.QueryType))
+	return text,err
+}
+
 func (p Page)HTML()(html string,err error){
 	err = chromedp.Run(p.Ctx,chromedp.OuterHTML("html", &html, chromedp.NodeVisible, chromedp.ByQuery))
 	return html,err
@@ -59,6 +64,15 @@ func (p Page)HTML()(html string,err error){
 
 func (s Selection)SendKeys(key string)error{
 	return chromedp.Run(s.Ctx, chromedp.SendKeys(s.Query, key,s.QueryType))
+}
+func (s Selection)RemoveInput()error{
+	return chromedp.Run(s.Ctx, chromedp.SetValue(s.Query, "",s.QueryType))
+}
+
+func (s Selection)GetInputValue()(string,error){
+	var resp string
+	err := chromedp.Run(s.Ctx, chromedp.Value(s.Query, &resp,s.QueryType))
+	return resp,err
 }
 
 func (s Selection)Click()error{
@@ -85,41 +99,54 @@ func (s Selection)Attribute(attribute string)(value string,err error){
 	err = chromedp.Run(s.Ctx,chromedp.AttributeValue(s.Query, attribute,&value,nil, s.QueryType))
 	return value,err
 }
+
 func (s Selection)Clear()error{
 	return chromedp.Run(s.Ctx,chromedp.Clear(s.Query, s.QueryType))
 }
 
-// TODO:Not Run
-func (p Page) RunScript(body string, arguments map[string]interface{}, result interface{})(err error){
-	if strings.Contains(body,"javascript:"){
-		return fmt.Errorf("'javascript' not support")
-	}
-	if !strings.Contains(body,"alert"){
-		//return fmt.Errorf("alert only support")
-	}
+func (s Selection)URL()(url string,err error){
+	err = chromedp.Run(s.Ctx,chromedp.Location(&url))
+	return url,err
+}
 
-	if arguments != nil{
-		return fmt.Errorf("not support arguments")
-	}
-	if result != nil{
-		return fmt.Errorf("not support result")
-	}
-	var resp string
-	err = chromedp.Run(p.Ctx,chromedp.Evaluate(body,&resp),chromedp.WaitVisible(`html`))
-	if err != nil{
-		if err.Error() == "encountered an undefined value"{
-			err = nil
-			return err
-		}
-		if strings.Contains(err.Error(),"encountered exception"){
-			fmt.Println("chromedp Evaluate error")
-			fmt.Println(err.Error())
-			return nil
-		}
-	}
-	// Run Wait
-	_ = p.Find("html").Click()
-	return err
+func (p Page)URL()(url string,err error){
+	err = chromedp.Run(p.Ctx,chromedp.Location(&url))
+	return url,err
+}
+
+// TODO:Not Run
+func (p Page) RunScript(script string)(resp []string,err error){
+	err = chromedp.Run(p.Ctx,chromedp.Evaluate(script,&resp))
+	return resp,err
+	//if strings.Contains(body,"javascript:"){
+	//	return fmt.Errorf("'javascript' not support")
+	//}
+	//if !strings.Contains(body,"alert"){
+	//	//return fmt.Errorf("alert only support")
+	//}
+	//
+	//if arguments != nil{
+	//	return fmt.Errorf("not support arguments")
+	//}
+	//if result != nil{
+	//	return fmt.Errorf("not support result")
+	//}
+	//var resp string
+	//err = chromedp.Run(p.Ctx,chromedp.Evaluate(body,&resp),chromedp.WaitVisible(`html`))
+	//if err != nil{
+	//	if err.Error() == "encountered an undefined value"{
+	//		err = nil
+	//		return err
+	//	}
+	//	if strings.Contains(err.Error(),"encountered exception"){
+	//		fmt.Println("chromedp Evaluate error")
+	//		fmt.Println(err.Error())
+	//		return nil
+	//	}
+	//}
+	//// Run Wait
+	//_ = p.Find("html").Click()
+	//return err
 }
 
 // Not Run
