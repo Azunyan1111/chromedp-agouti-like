@@ -30,6 +30,12 @@ func NewPage(isHeadless bool)(*Page,error){
 	return &Page{CtxAlloc:allocCtx,CancelAlloc:allocCancel, Ctx:taskCtx, CloseWindow:taskCancel},nil
 }
 
+func NewPageProxy(isHeadless bool,proxy string)(*Page,error){
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", isHeadless),chromedp.ProxyServer(proxy))...)
+	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
+	return &Page{CtxAlloc:allocCtx,CancelAlloc:allocCancel, Ctx:taskCtx, CloseWindow:taskCancel},nil
+}
+
 func (p *Page)Navigate(url string)error{
 	return chromedp.Run(p.Ctx, chromedp.Navigate(url))
 }
@@ -42,6 +48,18 @@ func (p *Page)Find(selector string)*Selection{
 	selection.QueryType = chromedp.ByQuery
 	return &selection
 }
+
+
+func (p *Page)FindXPath(xpath string)*Selection{
+	var selection Selection
+	selection.Page = p
+	selection.Ctx = p.Ctx
+	selection.Query = xpath
+	selection.QueryType = chromedp.BySearch
+	return &selection
+}
+
+
 
 func (s *Selection)Text()(text string,err error){
 	if s.Query == "title"{
