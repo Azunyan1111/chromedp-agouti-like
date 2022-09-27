@@ -10,7 +10,7 @@ import (
 )
 
 type Page struct {
-	CtxAlloc context.Context
+	CtxAlloc    context.Context
 	CancelAlloc context.CancelFunc
 
 	Ctx         context.Context
@@ -18,29 +18,29 @@ type Page struct {
 }
 
 type Selection struct {
-	Page *Page
-	Ctx context.Context
-	Query string
+	Page      *Page
+	Ctx       context.Context
+	Query     string
 	QueryType chromedp.QueryOption
 }
 
-func NewPage(isHeadless bool)(*Page,error){
+func NewPage(isHeadless bool) (*Page, error) {
 	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", isHeadless))...)
 	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
-	return &Page{CtxAlloc:allocCtx,CancelAlloc:allocCancel, Ctx:taskCtx, CloseWindow:taskCancel},nil
+	return &Page{CtxAlloc: allocCtx, CancelAlloc: allocCancel, Ctx: taskCtx, CloseWindow: taskCancel}, nil
 }
 
-func NewPageProxy(isHeadless bool,proxy string)(*Page,error){
-	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", isHeadless),chromedp.ProxyServer(proxy))...)
+func NewPageProxy(isHeadless bool, proxy string) (*Page, error) {
+	allocCtx, allocCancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.Flag("headless", isHeadless), chromedp.ProxyServer(proxy))...)
 	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
-	return &Page{CtxAlloc:allocCtx,CancelAlloc:allocCancel, Ctx:taskCtx, CloseWindow:taskCancel},nil
+	return &Page{CtxAlloc: allocCtx, CancelAlloc: allocCancel, Ctx: taskCtx, CloseWindow: taskCancel}, nil
 }
 
-func (p *Page)Navigate(url string)error{
+func (p *Page) Navigate(url string) error {
 	return chromedp.Run(p.Ctx, chromedp.Navigate(url))
 }
 
-func (p *Page)Find(selector string)*Selection{
+func (p *Page) Find(selector string) *Selection {
 	var selection Selection
 	selection.Page = p
 	selection.Ctx = p.Ctx
@@ -49,8 +49,7 @@ func (p *Page)Find(selector string)*Selection{
 	return &selection
 }
 
-
-func (p *Page)FindXPath(xpath string)*Selection{
+func (p *Page) FindXPath(xpath string) *Selection {
 	var selection Selection
 	selection.Page = p
 	selection.Ctx = p.Ctx
@@ -59,53 +58,57 @@ func (p *Page)FindXPath(xpath string)*Selection{
 	return &selection
 }
 
-
-
-func (s *Selection)Text()(text string,err error){
-	if s.Query == "title"{
+func (s *Selection) Text() (text string, err error) {
+	if s.Query == "title" {
 		err = chromedp.Run(s.Ctx, chromedp.Title(&text))
-		return text,err
+		return text, err
 	}
 	err = chromedp.Run(s.Ctx, chromedp.Text(s.Query, &text, chromedp.NodeVisible, s.QueryType))
-	return text,err
+	return text, err
 }
 
-func (s *Selection)Value()(text string,err error){
-	err = chromedp.Run(s.Ctx,chromedp.Value(s.Query,&text, chromedp.NodeVisible, s.QueryType))
-	return text,err
+func (s *Selection) Value() (text string, err error) {
+	err = chromedp.Run(s.Ctx, chromedp.Value(s.Query, &text, chromedp.NodeVisible, s.QueryType))
+	return text, err
 }
 
-func (p Page)HTML()(html string,err error){
-	err = chromedp.Run(p.Ctx,chromedp.OuterHTML("html", &html, chromedp.NodeVisible, chromedp.ByQuery))
-	return html,err
+func (p Page) HTML() (html string, err error) {
+	err = chromedp.Run(p.Ctx, chromedp.OuterHTML("html", &html, chromedp.NodeVisible, chromedp.ByQuery))
+	return html, err
 }
 
-func (s Selection)SendKeys(key string)error{
-	return chromedp.Run(s.Ctx, chromedp.SendKeys(s.Query, key,s.QueryType))
-}
-func (s Selection)RemoveInput()error{
-	return chromedp.Run(s.Ctx, chromedp.SetValue(s.Query, "",s.QueryType))
+func (s Selection) SendKeys(key string) error {
+	return chromedp.Run(s.Ctx, chromedp.SendKeys(s.Query, key, s.QueryType))
 }
 
-func (s Selection)GetInputValue()(string,error){
+// document.querySelector('#container').shadowRoot.querySelector('#foo')
+func (s Selection) SendKeyByShadowDOM(key string) error {
+	return chromedp.Run(s.Ctx, chromedp.SendKeys(s.Query, key, chromedp.ByJSPath))
+}
+
+func (s Selection) RemoveInput() error {
+	return chromedp.Run(s.Ctx, chromedp.SetValue(s.Query, "", s.QueryType))
+}
+
+func (s Selection) GetInputValue() (string, error) {
 	var resp string
-	err := chromedp.Run(s.Ctx, chromedp.Value(s.Query, &resp,s.QueryType))
-	return resp,err
+	err := chromedp.Run(s.Ctx, chromedp.Value(s.Query, &resp, s.QueryType))
+	return resp, err
 }
 
-func (s Selection)Click()error{
-	if strings.Contains(s.Query,"option"){
+func (s Selection) Click() error {
+	if strings.Contains(s.Query, "option") {
 		// Javascript run click
 		fmt.Println("document.querySelector(`" + s.Query + "`).selected = true")
 		fmt.Println(s.Query)
-		err := chromedp.Run(s.Ctx,Evaluate("document.querySelector(`" + s.Query + "`).selected = true;if (window.jQuery) {$(`" + s.Query + "`).change()}else{document.querySelector(`" + s.Query + "`).onchange()}"))
+		err := chromedp.Run(s.Ctx, Evaluate("document.querySelector(`"+s.Query+"`).selected = true;if (window.jQuery) {$(`"+s.Query+"`).change()}else{document.querySelector(`"+s.Query+"`).onchange()}"))
 		_ = s.Page.Find("html").Click()
 		return err
 	}
-	return chromedp.Run(s.Ctx,chromedp.Click(s.Query,chromedp.NodeVisible,s.QueryType))
+	return chromedp.Run(s.Ctx, chromedp.Click(s.Query, chromedp.NodeVisible, s.QueryType))
 }
 
-func (s Selection)UploadFile(filename string)error{
+func (s Selection) UploadFile(filename string) error {
 	absFilePath, err := filepath.Abs(filename)
 	if err != nil {
 		return fmt.Errorf("failed to find absolute path for filename: %s", err)
@@ -113,29 +116,29 @@ func (s Selection)UploadFile(filename string)error{
 	return s.SendKeys(absFilePath)
 }
 
-func (s Selection)Attribute(attribute string)(value string,err error){
-	err = chromedp.Run(s.Ctx,chromedp.AttributeValue(s.Query, attribute,&value,nil, s.QueryType))
-	return value,err
+func (s Selection) Attribute(attribute string) (value string, err error) {
+	err = chromedp.Run(s.Ctx, chromedp.AttributeValue(s.Query, attribute, &value, nil, s.QueryType))
+	return value, err
 }
 
-func (s Selection)Clear()error{
-	return chromedp.Run(s.Ctx,chromedp.Clear(s.Query, s.QueryType))
+func (s Selection) Clear() error {
+	return chromedp.Run(s.Ctx, chromedp.Clear(s.Query, s.QueryType))
 }
 
-func (s Selection)URL()(url string,err error){
-	err = chromedp.Run(s.Ctx,chromedp.Location(&url))
-	return url,err
+func (s Selection) URL() (url string, err error) {
+	err = chromedp.Run(s.Ctx, chromedp.Location(&url))
+	return url, err
 }
 
-func (p Page)URL()(url string,err error){
-	err = chromedp.Run(p.Ctx,chromedp.Location(&url))
-	return url,err
+func (p Page) URL() (url string, err error) {
+	err = chromedp.Run(p.Ctx, chromedp.Location(&url))
+	return url, err
 }
 
 // TODO:Not Run
-func (p Page) RunScript(script string)(resp []string,err error){
-	err = chromedp.Run(p.Ctx,chromedp.Evaluate(script,&resp))
-	return resp,err
+func (p Page) RunScript(script string) (resp []string, err error) {
+	err = chromedp.Run(p.Ctx, chromedp.Evaluate(script, &resp))
+	return resp, err
 	//if strings.Contains(body,"javascript:"){
 	//	return fmt.Errorf("'javascript' not support")
 	//}
@@ -168,7 +171,7 @@ func (p Page) RunScript(script string)(resp []string,err error){
 }
 
 // Not Run
-func Evaluate(expression string)chromedp.EvaluateAction{
+func Evaluate(expression string) chromedp.EvaluateAction {
 	return chromedp.ActionFunc(func(ctx context.Context) error {
 		// set up parameters
 		p := runtime.Evaluate(expression)
